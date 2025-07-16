@@ -1,376 +1,354 @@
 "use client";
 
 import type React from "react";
-import { uploadFormData } from "@/app/actions/upload";
-
 import { useState, useCallback, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronRight, Mic } from "lucide-react";
-
+import { ChevronRight, Calendar, User, Mail } from "lucide-react";
 import { useConversation } from "@11labs/react";
 
 async function getSignedUrl(): Promise<string> {
+  console.log("Fetching signed URL...");
   const response = await fetch("/api/signed-url");
+  
   if (!response.ok) {
-    throw Error("Failed to get signed url");
+    const errorData = await response.json();
+    console.error("API Error:", errorData);
+    throw new Error(errorData.error || "Failed to get signed url");
   }
+  
   const data = await response.json();
+  console.log("Got signed URL successfully");
   return data.signedUrl;
 }
 
 function HomeContent() {
-  const [currentStep, setCurrentStep] = useState<
-    "initial" | "training" | "voice" | "email" | "ready"
-  >("initial");
-  const [activeTab, setActiveTab] = useState<"file" | "websites">("file");
-  const [fileData, setFileData] = useState<File[]>([]);
-  const [websiteUrls, setWebsiteUrls] = useState<string[]>([""]);
+  const [currentStep, setCurrentStep] = useState<"name_collection" | "email_collection" | "booking_conversation">("name_collection");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [userName, setUserName] = useState("");
-  const [conversationId, setConversationId] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const conversation = useConversation({
-    onConnect: () => console.log("Connected"),
-    onDisconnect: () => console.log("Disconnected"),
-    onMessage: (message: string) => console.log("Message:", message),
-    onError: (error: Error) => console.error("Error:", error),
+    onConnect: () => {
+      console.log("Connected to conversation");
+      setError(null);
+    },
+    onDisconnect: () => {
+      console.log("Disconnected from conversation");
+    },
+    onMessage: (message: string) => {
+      console.log("Message:", message);
+    },
+    onError: (error: Error) => {
+      console.error("Conversation Error:", error);
+      setError(`Conversation error: ${error.message}`);
+    },
   });
 
   const startConversation = useCallback(async () => {
     try {
+      setError(null);
+      console.log("Starting booking conversation");
+      
       // Request microphone permission
+      console.log("Requesting microphone permission...");
       await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Start the conversation with your agent
+      console.log("Microphone permission granted");
+      
+      // Get signed URL
       const signedUrl = await getSignedUrl();
-      const convId = await conversation.startSession({
+      console.log("Starting session with signed URL");
+      
+      // Start the conversation with your agent
+      await conversation.startSession({
         signedUrl,
-        dynamicVariables: {
-          user_name: userName,
-        },
         clientTools: {
           set_ui_state: ({ step }: { step: string }): string => {
-            // Allow agent to navigate the UI.
-            setCurrentStep(
-              step as "initial" | "training" | "voice" | "email" | "ready"
-            );
+            console.log("Agent navigating to step:", step);
+            setCurrentStep(step as "name_collection" | "email_collection" | "booking_conversation");
             return `Navigated to ${step}`;
           },
         },
       });
-      setConversationId(convId);
-      console.log("Conversation ID:", convId);
+      
+      console.log("Conversation started successfully");
     } catch (error) {
       console.error("Failed to start conversation:", error);
+      setError(error instanceof Error ? error.message : String(error));
     }
-  }, [conversation, userName]);
-  const stopConversation = useCallback(async () => {
-    await conversation.endSession();
   }, [conversation]);
 
-  const handleEmailSubmit = () => {
-    stopConversation();
+  const stopConversation = useCallback(async () => {
+    try {
+      await conversation.endSession();
+      console.log("Conversation ended");
+    } catch (error) {
+      console.error("Error ending conversation:", error);
+    }
+  }, [conversation]);
+
+  const handleNameSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (firstName.trim() && lastName.trim()) {
+      console.log("Names collected:", { firstName, lastName });
+      // The agent will handle the transition to email collection
+    }
   };
 
-  const addWebsiteField = () => {
-    setWebsiteUrls([...websiteUrls, ""]);
+  const handleEmailSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (email.trim()) {
+      console.log("Email collected:", email);
+      // The agent will handle the transition to booking conversation
+    }
   };
 
-  const updateWebsiteUrl = (index: number, value: string) => {
-    const updatedUrls = [...websiteUrls];
-    updatedUrls[index] = value;
-    setWebsiteUrls(updatedUrls);
+  const getStepIcon = () => {
+    switch (currentStep) {
+      case "name_collection":
+        return <User className="h-6 w-6" />;
+      case "email_collection":
+        return <Mail className="h-6 w-6" />;
+      case "booking_conversation":
+        return <Calendar className="h-6 w-6" />;
+    }
+  };
+
+  const getStepTitle = () => {
+    switch (currentStep) {
+      case "name_collection":
+        return "Let's Get Started";
+      case "email_collection":
+        return "Contact Information";
+      case "booking_conversation":
+        return "Book Your Consultation";
+    }
+  };
+
+  const getStepDescription = () => {
+    switch (currentStep) {
+      case "name_collection":
+        return "Please provide your name so we can personalize your experience";
+      case "email_collection":
+        return "We'll need your email to send booking confirmation";
+      case "booking_conversation":
+        return `Hi ${firstName}! Let's discuss your AI agent needs and find the perfect consultation time`;
+    }
   };
 
   return (
     <main className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md mx-auto">
-        <div className="mb-8 flex justify-right">
-          <img
-            src="/elevenlabs-logo-white.svg"
-            alt="ElevenLabs Logo"
-            className="h-12 w-auto"
-          />
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-blue-500 bg-clip-text text-transparent">
+            AXIE STUDIO
+          </h1>
+          <p className="text-sm text-gray-400 mt-1">AI Agent Consultation Booking</p>
         </div>
-        <div className={currentStep === "initial" ? "block" : "hidden"}>
-          <div className="space-y-8">
-            <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-purple-400 to-blue-500 bg-clip-text text-transparent">
-              Design your Conversational AI Agent
-            </h1>
-            <p className="text-lg text-gray-300">
-              Let's have a chat to design your helpful conversational AI agent!
-              Click start and enable microphone access.
+
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-900/50 border border-red-700 rounded-lg">
+            <p className="text-red-300 text-sm">{error}</p>
+            <p className="text-red-400 text-xs mt-2">
+              Please check that your ElevenLabs agent is properly configured.
             </p>
+          </div>
+        )}
 
-            <div className="space-y-4">
-              <Label htmlFor="name-input" className="text-sm text-gray-400">
-                Your Name
-              </Label>
-              <Input
-                id="name-input"
-                type="text"
-                placeholder="Enter your name"
-                className="bg-gray-800 border-gray-700 text-white"
-                value={userName}
-                onChange={e => setUserName(e.target.value)}
-                required
-              />
+        {/* Progress Indicator */}
+        <div className="mb-8">
+          <div className="flex items-center justify-center space-x-4 mb-4">
+            <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
+              currentStep === "name_collection" ? "bg-purple-600" : "bg-gray-700"
+            }`}>
+              <User className="h-5 w-5" />
             </div>
-
-            <Button
-              type="button"
-              onClick={startConversation}
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white py-6"
-              disabled={!userName.trim() || conversation.status === "connected"}
-            >
-              <span>Start</span>
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
+            <div className={`h-1 w-8 ${
+              ["email_collection", "booking_conversation"].includes(currentStep) ? "bg-purple-600" : "bg-gray-700"
+            }`} />
+            <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
+              currentStep === "email_collection" ? "bg-purple-600" : "bg-gray-700"
+            }`}>
+              <Mail className="h-5 w-5" />
+            </div>
+            <div className={`h-1 w-8 ${
+              currentStep === "booking_conversation" ? "bg-purple-600" : "bg-gray-700"
+            }`} />
+            <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
+              currentStep === "booking_conversation" ? "bg-purple-600" : "bg-gray-700"
+            }`}>
+              <Calendar className="h-5 w-5" />
+            </div>
           </div>
         </div>
 
-        <form
-          action={uploadFormData}
-          onSubmit={handleEmailSubmit}
-          className="space-y-6"
-        >
-          <input type="hidden" name="conversation-id" value={conversationId} />
-          <div className={currentStep === "training" ? "block" : "hidden"}>
-            <div className="space-y-8">
-              <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-purple-400 to-blue-500 bg-clip-text text-transparent">
-                Train Your Agent
-              </h1>
-
-              <div className="bg-gray-900 rounded-lg p-6">
-                <div className="flex border-b border-gray-800 mb-6">
-                  <button
-                    className={`py-2 px-4 ${
-                      activeTab === "file"
-                        ? "border-b-2 border-purple-500 text-white"
-                        : "text-gray-400 hover:text-gray-200"
-                    }`}
-                    onClick={() => setActiveTab("file")}
-                    type="button"
-                  >
-                    File Upload
-                  </button>
-                  <button
-                    className={`py-2 px-4 ${
-                      activeTab === "websites"
-                        ? "border-b-2 border-purple-500 text-white"
-                        : "text-gray-400 hover:text-gray-200"
-                    }`}
-                    onClick={() => setActiveTab("websites")}
-                    type="button"
-                  >
-                    Websites
-                  </button>
-                </div>
-
-                <div className="space-y-6">
-                  <div className={activeTab === "file" ? "block" : "hidden"}>
-                    <div className="space-y-4">
-                      <Label
-                        htmlFor="file-upload"
-                        className="text-sm text-gray-400"
-                      >
-                        Upload Knowledge Base
-                      </Label>
-                      <div className="border-2 border-dashed border-gray-700 rounded-lg p-8 text-center">
-                        <input
-                          id="file-upload"
-                          name="file-upload"
-                          type="file"
-                          multiple
-                          className="hidden"
-                          onChange={e => {
-                            const files = Array.from(e.target.files || []);
-                            setFileData(files);
-                          }}
-                        />
-                        <label
-                          htmlFor="file-upload"
-                          className="cursor-pointer flex flex-col items-center justify-center"
-                        >
-                          <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center mb-4">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="24"
-                              height="24"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="text-purple-400"
-                            >
-                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                              <polyline points="17 8 12 3 7 8"></polyline>
-                              <line x1="12" y1="3" x2="12" y2="15"></line>
-                            </svg>
-                          </div>
-                          <p className="text-sm text-gray-400">
-                            {fileData.length > 0
-                              ? `${fileData.length} files selected`
-                              : "Drag and drop your files here, or click to browse"}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-2">
-                            Supports PDF, DOCX, TXT (max 10MB per file)
-                          </p>
-                        </label>
-                      </div>
-
-                      {fileData.length > 0 && (
-                        <div className="space-y-2">
-                          <p className="text-sm text-gray-400">
-                            Selected files:
-                          </p>
-                          <ul className="space-y-1">
-                            {fileData.map((file, index) => (
-                              <li
-                                key={index}
-                                className="flex justify-between items-center text-sm text-gray-300 bg-gray-800 p-2 rounded"
-                              >
-                                <span>{file.name}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setFileData(
-                                      fileData.filter((_, i) => i !== index)
-                                    );
-                                  }}
-                                  className="text-red-400 hover:text-red-300"
-                                >
-                                  Remove
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div
-                    className={activeTab === "websites" ? "block" : "hidden"}
-                  >
-                    <div className="space-y-4">
-                      <Label className="text-sm text-gray-400">
-                        Enter Website URLs
-                      </Label>
-                      {websiteUrls.map((url, index) => (
-                        <div key={index} className="flex gap-2">
-                          <Input
-                            name="url-input"
-                            placeholder="https://example.com/docs"
-                            className="bg-gray-800 border-gray-700 text-white"
-                            value={url}
-                            onChange={e =>
-                              updateWebsiteUrl(index, e.target.value)
-                            }
-                          />
-                          {index === websiteUrls.length - 1 && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="border-gray-700 text-gray-400"
-                              onClick={addWebsiteField}
-                            >
-                              +
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                      <p className="text-xs text-gray-500">
-                        We'll crawl these websites to build your agent's
-                        knowledge base
-                      </p>
-                    </div>
-                  </div>
-                </div>
+        {/* Name Collection Step */}
+        <div className={currentStep === "name_collection" ? "block" : "hidden"}>
+          <div className="space-y-8">
+            <div className="text-center">
+              <div className="flex items-center justify-center mb-4">
+                {getStepIcon()}
               </div>
-            </div>
-          </div>
-
-          <div className={currentStep === "voice" ? "block" : "hidden"}>
-            <div className="space-y-8">
               <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-purple-400 to-blue-500 bg-clip-text text-transparent">
-                Design Your Agent's Voice
+                {getStepTitle()}
               </h1>
-              <div className="bg-gray-900 rounded-lg p-6">
-                <div className="space-y-6">
-                  <div className="space-y-4">
-                    <Label
-                      htmlFor="voice-input"
-                      className="text-lg text-gray-300"
-                    >
-                      Describe the voice you want for your agent
-                    </Label>
-                    <p className="text-sm text-gray-400 italic">
-                      For example: "A professional, strong spoken female voice
-                      with a slight British accent."
-                    </p>
-                    <div className="flex items-center justify-center w-full h-32 bg-gray-800 rounded-lg">
-                      <Mic size={48} className="text-purple-400" />
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <p className="text-lg text-gray-300 mt-4">
+                {getStepDescription()}
+              </p>
             </div>
-          </div>
 
-          <div className={currentStep === "email" ? "block" : "hidden"}>
-            <div className="space-y-8">
-              <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-purple-400 to-blue-500 bg-clip-text text-transparent">
-                Deploy Your Agent
-              </h1>
-              <div className="bg-gray-900 rounded-lg p-6">
-                <div className="space-y-4">
-                  <Label
-                    htmlFor="email-input"
-                    className="text-sm text-gray-400"
-                  >
-                    Your Email Address
+            <form onSubmit={handleNameSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="first-name" className="text-sm text-gray-400">
+                    First Name
                   </Label>
                   <Input
-                    id="email-input"
-                    name="email-input"
-                    type="email"
-                    placeholder="you@example.com"
+                    id="first-name"
+                    type="text"
+                    placeholder="John"
                     className="bg-gray-800 border-gray-700 text-white"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
+                    value={firstName}
+                    onChange={e => setFirstName(e.target.value)}
                     required
                   />
-                  <p className="text-sm text-gray-400">
-                    Do you want to deploy this agent on your site? Submit your
-                    email address and we will send you the instructions to do
-                    so.
-                  </p>
                 </div>
-                <Button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white py-6"
-                >
-                  <span>Send Instructions</span>
-                  <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
+                <div>
+                  <Label htmlFor="last-name" className="text-sm text-gray-400">
+                    Last Name
+                  </Label>
+                  <Input
+                    id="last-name"
+                    type="text"
+                    placeholder="Doe"
+                    className="bg-gray-800 border-gray-700 text-white"
+                    value={lastName}
+                    onChange={e => setLastName(e.target.value)}
+                    required
+                  />
+                </div>
               </div>
+
+              <Button
+                type="button"
+                onClick={startConversation}
+                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white py-6"
+                disabled={!firstName.trim() || !lastName.trim() || conversation.status === "connected"}
+              >
+                <span>
+                  {conversation.status === "connected" ? "Connected - Speak Now" : "Start Conversation"}
+                </span>
+                <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+              
+              {conversation.status === "connecting" && (
+                <p className="text-center text-gray-400 text-sm">Connecting...</p>
+              )}
+            </form>
+          </div>
+        </div>
+
+        {/* Email Collection Step */}
+        <div className={currentStep === "email_collection" ? "block" : "hidden"}>
+          <div className="space-y-8">
+            <div className="text-center">
+              <div className="flex items-center justify-center mb-4">
+                {getStepIcon()}
+              </div>
+              <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-purple-400 to-blue-500 bg-clip-text text-transparent">
+                {getStepTitle()}
+              </h1>
+              <p className="text-lg text-gray-300 mt-4">
+                {getStepDescription()}
+              </p>
+            </div>
+
+            <form onSubmit={handleEmailSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="email-input" className="text-sm text-gray-400">
+                  Email Address
+                </Label>
+                <Input
+                  id="email-input"
+                  type="email"
+                  placeholder="john.doe@example.com"
+                  className="bg-gray-800 border-gray-700 text-white"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="bg-gray-900 rounded-lg p-4">
+                <p className="text-sm text-gray-400">
+                  Continue speaking with Alex to proceed to the booking conversation.
+                </p>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        {/* Booking Conversation Step */}
+        <div className={currentStep === "booking_conversation" ? "block" : "hidden"}>
+          <div className="space-y-8">
+            <div className="text-center">
+              <div className="flex items-center justify-center mb-4">
+                {getStepIcon()}
+              </div>
+              <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-purple-400 to-blue-500 bg-clip-text text-transparent">
+                {getStepTitle()}
+              </h1>
+              <p className="text-lg text-gray-300 mt-4">
+                {getStepDescription()}
+              </p>
+            </div>
+
+            <div className="bg-gray-900 rounded-lg p-6">
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3">
+                  <User className="h-5 w-5 text-purple-400" />
+                  <span className="text-sm text-gray-300">{firstName} {lastName}</span>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <Mail className="h-5 w-5 text-purple-400" />
+                  <span className="text-sm text-gray-300">{email}</span>
+                </div>
+              </div>
+              
+              <div className="mt-6 p-4 bg-gray-800 rounded-lg">
+                <p className="text-sm text-gray-400 mb-2">
+                  <strong>Continue your conversation with Alex to:</strong>
+                </p>
+                <ul className="text-sm text-gray-400 space-y-1">
+                  <li>• Discuss your business and AI agent needs</li>
+                  <li>• Find the perfect consultation time</li>
+                  <li>• Get answers to your questions</li>
+                </ul>
+              </div>
+
+              <Button
+                onClick={stopConversation}
+                variant="outline"
+                className="w-full mt-4 border-gray-600 text-gray-300 hover:bg-gray-800"
+              >
+                End Conversation
+              </Button>
             </div>
           </div>
-        </form>
+        </div>
 
         <div className="text-center mt-8 text-sm text-gray-500">
           Powered by{" "}
           <a
-            href="https://elevenlabs.io/conversational-ai"
+            href="https://axiestudio.com"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-gray-400 transition-colors underline"
           >
-            ElevenLabs ConversationalAI
+            Axie Studio
           </a>
         </div>
       </div>
@@ -382,12 +360,11 @@ function LoadingFallback() {
   return (
     <main className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md mx-auto">
-        <div className="mb-8 flex justify-right">
-          <img
-            src="/elevenlabs-logo-white.svg"
-            alt="ElevenLabs Logo"
-            className="h-12 w-auto"
-          />
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-blue-500 bg-clip-text text-transparent">
+            AXIE STUDIO
+          </h1>
+          <p className="text-sm text-gray-400 mt-1">AI Agent Consultation Booking</p>
         </div>
         <div className="space-y-8">
           <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-purple-400 to-blue-500 bg-clip-text text-transparent">
