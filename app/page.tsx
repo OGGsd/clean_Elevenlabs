@@ -9,11 +9,17 @@ import { ChevronRight } from "lucide-react";
 import { useConversation } from "@11labs/react";
 
 async function getSignedUrl(): Promise<string> {
+  console.log("Fetching signed URL...");
   const response = await fetch("/api/signed-url");
+  
   if (!response.ok) {
-    throw Error("Failed to get signed url");
+    const errorData = await response.json();
+    console.error("API Error:", errorData);
+    throw new Error(errorData.error || "Failed to get signed url");
   }
+  
   const data = await response.json();
+  console.log("Got signed URL successfully");
   return data.signedUrl;
 }
 
@@ -21,20 +27,40 @@ function HomeContent() {
   const [currentStep, setCurrentStep] = useState<"initial" | "email">("initial");
   const [email, setEmail] = useState("");
   const [userName, setUserName] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const conversation = useConversation({
-    onConnect: () => console.log("Connected"),
-    onDisconnect: () => console.log("Disconnected"),
-    onMessage: (message: string) => console.log("Message:", message),
-    onError: (error: Error) => console.error("Error:", error),
+    onConnect: () => {
+      console.log("Connected to conversation");
+      setError(null);
+    },
+    onDisconnect: () => {
+      console.log("Disconnected from conversation");
+    },
+    onMessage: (message: string) => {
+      console.log("Message:", message);
+    },
+    onError: (error: Error) => {
+      console.error("Conversation Error:", error);
+      setError(`Conversation error: ${error.message}`);
+    },
   });
 
   const startConversation = useCallback(async () => {
     try {
+      setError(null);
+      console.log("Starting conversation for user:", userName);
+      
       // Request microphone permission
+      console.log("Requesting microphone permission...");
       await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Start the conversation with your agent
+      console.log("Microphone permission granted");
+      
+      // Get signed URL
       const signedUrl = await getSignedUrl();
+      console.log("Starting session with signed URL");
+      
+      // Start the conversation with your agent
       await conversation.startSession({
         signedUrl,
         dynamicVariables: {
@@ -42,26 +68,33 @@ function HomeContent() {
         },
         clientTools: {
           set_ui_state: ({ step }: { step: string }): string => {
-            // Allow agent to navigate the UI.
+            console.log("Agent navigating to step:", step);
             setCurrentStep(step as "initial" | "email");
             return `Navigated to ${step}`;
           },
         },
       });
+      
+      console.log("Conversation started successfully");
     } catch (error) {
       console.error("Failed to start conversation:", error);
+      setError(error instanceof Error ? error.message : String(error));
     }
   }, [conversation, userName]);
 
   const stopConversation = useCallback(async () => {
-    await conversation.endSession();
+    try {
+      await conversation.endSession();
+      console.log("Conversation ended");
+    } catch (error) {
+      console.error("Error ending conversation:", error);
+    }
   }, [conversation]);
 
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Email submitted:", email);
     stopConversation();
-    // You can add any additional logic here for what happens after email submission
   };
 
   return (
@@ -74,6 +107,16 @@ function HomeContent() {
             className="h-12 w-auto"
           />
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-900/50 border border-red-700 rounded-lg">
+            <p className="text-red-300 text-sm">{error}</p>
+            <p className="text-red-400 text-xs mt-2">
+              Please check that your ElevenLabs agent is properly configured with the system prompt and tools.
+            </p>
+          </div>
+        )}
 
         {/* Initial Step - Name Input */}
         <div className={currentStep === "initial" ? "block" : "hidden"}>
@@ -106,9 +149,15 @@ function HomeContent() {
               className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white py-6"
               disabled={!userName.trim() || conversation.status === "connected"}
             >
-              <span>Start Conversation</span>
+              <span>
+                {conversation.status === "connected" ? "Connected" : "Start Conversation"}
+              </span>
               <ChevronRight className="ml-2 h-4 w-4" />
             </Button>
+            
+            {conversation.status === "connecting" && (
+              <p className="text-center text-gray-400 text-sm">Connecting...</p>
+            )}
           </div>
         </div>
 
