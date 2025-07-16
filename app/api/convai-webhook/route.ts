@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import crypto from "crypto";
 
 export async function GET() {
-  return NextResponse.json({ status: "webhook listening" }, { status: 200 });
+  return NextResponse.json({ status: "booking webhook listening" }, { status: 200 });
 }
 
 export async function POST(req: NextRequest) {
@@ -18,13 +18,33 @@ export async function POST(req: NextRequest) {
     const { conversation_id, analysis, agent_id } = event.data;
 
     if (agent_id === process.env.ELEVENLABS_AGENT_ID) {
-      console.log("Conversation completed:", {
+      console.log("Booking conversation completed:", {
         conversation_id,
         analysis,
       });
       
-      // You can add any post-conversation logic here
-      // For example, save the conversation data, send notifications, etc.
+      // Extract booking data from the analysis
+      const bookingData = {
+        conversation_id,
+        first_name: analysis?.first_name || null,
+        last_name: analysis?.last_name || null,
+        email: analysis?.email || null,
+        booking_details: analysis?.booking_details || null,
+        timestamp: new Date().toISOString(),
+      };
+
+      console.log("Booking data collected:", bookingData);
+      
+      // TODO: Send this data to n8n webhook or other booking system
+      // Example:
+      // await fetch('YOUR_N8N_WEBHOOK_URL', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify(bookingData)
+      // });
+      
+      // For now, just log the booking data
+      console.log("Ready to send to n8n:", JSON.stringify(bookingData, null, 2));
     }
   }
 
