@@ -100,12 +100,11 @@ function HomeContent() {
   return (
     <main className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md mx-auto">
-        <div className="mb-8 flex justify-right">
-          <img
-            src="/elevenlabs-logo-white.svg"
-            alt="ElevenLabs Logo"
-            className="h-12 w-auto"
-          />
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-blue-500 bg-clip-text text-transparent">
+            AXIE STUDIO
+          </h1>
+          <p className="text-sm text-gray-400 mt-1">AI Agent Creation Platform</p>
         </div>
 
         {/* Error Display */}
@@ -196,12 +195,12 @@ function HomeContent() {
         <div className="text-center mt-8 text-sm text-gray-500">
           Powered by{" "}
           <a
-            href="https://elevenlabs.io/conversational-ai"
+            href="https://axiestudio.com"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-gray-400 transition-colors underline"
           >
-            ElevenLabs ConversationalAI
+            Axie Studio
           </a>
         </div>
       </div>
@@ -213,12 +212,11 @@ function LoadingFallback() {
   return (
     <main className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md mx-auto">
-        <div className="mb-8 flex justify-right">
-          <img
-            src="/elevenlabs-logo-white.svg"
-            alt="ElevenLabs Logo"
-            className="h-12 w-auto"
-          />
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-blue-500 bg-clip-text text-transparent">
+            AXIE STUDIO
+          </h1>
+          <p className="text-sm text-gray-400 mt-1">AI Agent Creation Platform</p>
         </div>
         <div className="space-y-8">
           <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-purple-400 to-blue-500 bg-clip-text text-transparent">

@@ -6,8 +6,8 @@ import { Inter } from "next/font/google"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Create your Conversational AI Agent | ElevenLabs",
-  description: "Create a custom AI agent for your website",
+  title: "Create your Conversational AI Agent | Axie Studio",
+  description: "Create a custom AI agent for your business with Axie Studio",
     generator: 'v0.dev'
 }
 
